@@ -1,0 +1,19 @@
+{
+  "Properties": {
+
+  },
+  "Nodes": [{
+      "ID": "",
+      "Mapping": {
+        "key": "value"
+      },
+      "VideoDataKey": "",
+      "Events": {
+        "OnEnter": {
+          "BGMusicKey": ""
+        },
+        "OnLeave": {
+        }
+      }
+  }]
+}
