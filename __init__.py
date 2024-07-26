@@ -398,7 +398,8 @@ class ImAppendNode:
     def INPUT_TYPES(s):
         # input_dir = config.ImmortalConfig.sucaipath
         input_dir = folder_paths.get_input_directory()
-        files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
+        files = [item.replace(input_dir+'\\', '').replace('\\', '/') for item in Utils.listAllFilesInSubFolder(input_dir)]
+        # files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
         return {
             "required":{
                 "entity": ("IMMORTALENTITY",),
@@ -481,6 +482,47 @@ class ImAppendNode:
         newEntity = Utils.cloneDict(entity)
         # return (newEntity,)
         return newEntity, node['ID']
+        pass
+
+class mergeEntityAndPointer:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "entity1": ("IMMORTALENTITY",),
+                "entity2": ("IMMORTALENTITY",),
+                "extraPrev1": ("NODE", {"default": None}),
+                "extraPrev2": ("NODE", {"default": None})
+            },
+            "optional": {
+                "entity3": ("IMMORTALENTITY",),
+                "entity4": ("IMMORTALENTITY",),
+                "entity5": ("IMMORTALENTITY",),
+                "extraPrev3": ("NODE", {"default": None}),
+                "extraPrev4": ("NODE", {"default": None}),
+                "extraPrev5": ("NODE", {"default": None})
+            }
+        }
+        pass
+    RETURN_TYPES = ("IMMORTALENTITY","NODE","NODES")
+    RETURN_NAMES = ("entity","pointer","others")
+
+    FUNCTION = "process"
+
+    # OUTPUT_NODE = False
+
+    CATEGORY = "Immortal"
+
+    def process(self, entity1,entity2,extraPrev1,extraPrev2,entity3,entity4,entity5,extraPrev3=None,extraPrev4=None,extraPrev5=None):
+        Node_merge = ImMergeNode()
+        mergedEntity = Node_merge.process(entity1, entity2, entity3, entity4, entity5)
+        Node_batchnode = batchNodes()
+        batched = Node_batchnode.process(extraPrev2,extraPrev3,extraPrev4,extraPrev5)
+
+        return (mergedEntity, extraPrev1, batched)
         pass
 
 class batchNodes:
@@ -646,6 +688,37 @@ class ImMergeNode:
                             cnodelist.append(newNode)
 
         return (current,)
+        pass
+
+class ImNodeTitleOverride:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required":{
+                "sceneEntity": ("IMMORTALENTITY",),
+                "node": ("NODE",),
+                "fromNode": ("NODE",),
+                "overrideTitle": ("STRING", {"default": r""}),
+            }
+        }
+        pass
+    RETURN_TYPES = ("IMMORTALENTITY","NODE")
+    # RETURN_NAMES = ("image_output_name",)
+
+    FUNCTION = "process"
+
+    # OUTPUT_NODE = False
+
+    CATEGORY = "Immortal"
+
+    def process(self, sceneEntity, node, fromNode, overrideTitle):
+        currentnode = ImmortalEntity.getNodeById(sceneEntity, node)
+        ImmortalEntity.setTitleOverride(currentnode, fromNode, overrideTitle)
+        newEntity = Utils.cloneDict(sceneEntity)
+        return newEntity, node
         pass
 
 class SetNodeMapping:
@@ -973,7 +1046,9 @@ NODE_CLASS_MAPPINGS = {
     "ImApplyWav2lip":ImApplyWav2lip,
     "ImDumpEntity":ImDumpEntity,
     "LoadPackage":LoadPackage,
-    "SetNodeMapping":SetNodeMapping
+    "SetNodeMapping":SetNodeMapping,
+    "ImNodeTitleOverride":ImNodeTitleOverride,
+    "mergeEntityAndPointer":mergeEntityAndPointer
 }
 
 # A dictionary that contains the friendly/humanly readable titles for the nodes
@@ -992,5 +1067,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "ImApplyWav2lip":"ImApplyWav2lip",
     "ImDumpEntity":"ImDumpEntity",
     "LoadPackage":"LoadPackage",
-    "SetNodeMapping":"SetNodeMapping"
+    "SetNodeMapping":"SetNodeMapping",
+    "ImNodeTitleOverride":"ImNodeTitleOverride",
+    "mergeEntityAndPointer":"mergeEntityAndPointer"
 }

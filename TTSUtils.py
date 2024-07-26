@@ -15,7 +15,7 @@ class TTSUtils:
     regularFemale=9245
 
     @staticmethod
-    def ChatTTS(text, to, speed=5, voiceid=9245):
+    def ChatTTS(text, to, speed=1, voiceid=9245):
         headers = {"Content-Type": "application/json"}
         text = {"text": text, "seed": voiceid, "speed": speed}
         response = requests.post("http://localhost:9880", data=json.dumps(text), headers=headers)

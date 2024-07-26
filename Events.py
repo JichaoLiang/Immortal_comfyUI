@@ -90,6 +90,7 @@ class EventHandler:
         return context
         pass
 
+
     @staticmethod
     def conditionMapping(nodeid:str, context:dict, node:dict)->bool:
         mapping:list = node["Mapping"]
@@ -97,18 +98,24 @@ class EventHandler:
         if previdlist is not None and len(previdlist) > 0:
             if not previdlist.__contains__(nodeid):
                 return False
+        else:
+            # empty mapping, which means root node
+            if len(mapping) == 1 and mapping[0].keys().__iter__().__next__() == 'Parent':
+                return False
         for item in mapping:
             k = item.keys().__iter__().__next__()
             val = item[k]
             if k == "Parent":
                 continue
-
-            var1 = val[0]
-            var2 = val[1]
-            if EventHandler.Conditiondict.keys().__contains__(k):
-                func = EventHandler.Conditiondict[k]
-                result = func(context, var1, var2)
-                if not result:
-                    return False
+            result = EventHandler.handleCondition(context,item)
+            if not result:
+                return False
+            # var1 = val[0]
+            # var2 = val[1]
+            # if EventHandler.Conditiondict.keys().__contains__(k):
+            #     func = EventHandler.Conditiondict[k]
+            #     result = func(context, val)
+            #     if not result:
+            #         return False
         return True
         pass
