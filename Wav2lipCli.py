@@ -1,12 +1,40 @@
 import os
+import shutil
 import sys
+
+# script_path = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
+# parentPath = os.path.dirname(script_path)
+# sys.path.append(script_path)
+# sys.path.append(parentPath)
+# sys.path.append("")
+# print(script_path)
 
 from .Utils import Utils
 import time
 import hashlib
 import json
 
+musetalkpkg = __import__("ComfyUI-MuseTalk")
+musetalknodes = musetalkpkg.nodes
+vhspkg = __import__("ComfyUI-VideoHelperSuite")
+vhsnodes = vhspkg.videohelpersuite.nodes
+
 class Wav2lipCli:
+    @staticmethod
+    def musetalk(audioPath: str, faceVideoPath: str, toPath: str, bbox_shift=6, batch_size=16):
+        # Utils.mkdir(toPath)
+        musetalk = musetalknodes.MuseTalkRun()
+        images = musetalk.run(faceVideoPath,audioPath,bbox_shift,batch_size)[0]
+        loadaudio = vhsnodes.LoadAudio()
+        audio = loadaudio.load_audio(audio_file=audioPath, seek_seconds=0)[0]
+        videocombine = vhsnodes.VideoCombine()
+        filenames = videocombine.combine_video(images=images,audio=audio,frame_rate=30,loop_count=0,format="video/h264-mp4")
+        print(filenames)
+        filenames = filenames["result"]
+        resultpath = filenames[0][-1][-1]
+        shutil.move(resultpath,toPath)
+        pass
+
     @staticmethod
     def wav2lip(audioPath: str, faceVideoPath: str, toPath: str):
         Utils.mkdir(toPath)
@@ -50,6 +78,13 @@ class Wav2lipCli:
         Wav2lipCli.wav2lip(audio, video, to)
 
     @staticmethod
+    def testMuseTalk():
+        audioPath = r'r:/xTTS_ll_open1.wav'
+        faceVideoPath = r'D:\MyWork\data\sucai\zhangguorong\shanghai_clip_1.mp4'
+        toPath = r'r:/zgr_open1.mp4'
+        Wav2lipCli.musetalk(audioPath, faceVideoPath, toPath)
+
+    @staticmethod
     def batchTest():
         i = 0
         inputTemp = r'd:\{0}.wav.converted.wav'
@@ -86,7 +121,7 @@ class Wav2lipCli:
             print(c)
 
     @staticmethod
-    def wav2lip_batch(videolist, voicelist):
+    def convert_batch(videolist, voicelist, use="musetalk"):
         resultid = []
         result = []
         for i in range(0, len(videolist)):
@@ -94,7 +129,7 @@ class Wav2lipCli:
             voice = voicelist[i]
 
             # md5Cache
-            obj = {"function": "wav2liputils", "video": video, "voice": voice }
+            obj = {"function": f"wav2lip_{use}", "video": video, "voice": voice }
             md5 = hashlib.md5(json.dumps(obj).encode('utf-8')).hexdigest()
             keyExists = Utils.objectStorekeyExists(md5)
             if keyExists:
@@ -103,7 +138,12 @@ class Wav2lipCli:
                 to = cache["path"]
             else:
                 toid, to = Utils.generatePathId(namespace="wav2lip", exten="mp4")
-                Wav2lipCli.wav2lip(voice, video, to)
+                if use=="musetalk":
+                    Wav2lipCli.musetalk(voice, video, to)
+                elif use=="wav2lip":
+                    Wav2lipCli.wav2lip(voice, video, to)
+                else:
+                    Wav2lipCli.wav2lip(voice, video, to)
                 Utils.setObjectStoreKey(md5, json.dumps({"id":toid, "path":to}))
             resultid.append(toid)
             result.append(to)
@@ -111,13 +151,10 @@ class Wav2lipCli:
         pass
 
 
+
 if __name__ == '__main__':
-    script_path = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
-    sys.path.append(script_path)
-    sys.path.append("")
-    sys.path.append(script_path)
-    print(script_path)
-    import Utils
+    # import Utils
     # Wav2lipCli.testVC()
-    Wav2lipCli.test()
+    # Wav2lipCli.test()
     # Wav2lipCli.batchTest2()
+    Wav2lipCli.testMuseTalk()

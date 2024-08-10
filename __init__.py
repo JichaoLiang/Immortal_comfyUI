@@ -206,6 +206,34 @@ class ApplyVoiceConversion:
         return (newEntity,)
         pass
 
+class ImDumpNode:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required":{
+                "sceneEntity": ("IMMORTALENTITY",),
+                "pointer": ("NODE",)
+            }
+        }
+        pass
+    RETURN_TYPES = ("STRING",)
+    # RETURN_NAMES = ("image_output_name",)
+
+    FUNCTION = "process"
+
+    # OUTPUT_NODE = False
+
+    CATEGORY = "Immortal"
+
+    def process(self, sceneEntity, pointer):
+        node = ImmortalEntity.getNodeById(sceneEntity, pointer)
+        jsstr = json.dumps(node)
+        return (jsstr,)
+        pass
+
 class ImDumpEntity:
     def __init__(self):
         pass
@@ -240,7 +268,8 @@ class ImApplyWav2lip:
     def INPUT_TYPES(s):
         return {
             "required":{
-                "sceneEntity": ("IMMORTALENTITY",)
+                "sceneEntity": ("IMMORTALENTITY",),
+                "use": (["musetalk", "wav2lip"], {"default": "musetalk"}),
             }
         }
         pass
@@ -263,7 +292,7 @@ class ImApplyWav2lip:
                 return videopath, voicePath
         return None,None
 
-    def process(self, sceneEntity):
+    def process(self, sceneEntity, use="musetalk"):
         nodes = sceneEntity["Nodes"]
         idlist = []
         videolist = []
@@ -275,7 +304,7 @@ class ImApplyWav2lip:
             idlist.append(node['ID'])
             videolist.append(source)
             voicelist.append(dest)
-        resultidlist, resultPathlist = Wav2lipCli.wav2lip_batch(videolist, voicelist)
+        resultidlist, resultPathlist = Wav2lipCli.convert_batch(videolist, voicelist, use)
         for i in range(0, len(idlist)):
             node = ImmortalEntity.getNodeById(sceneEntity, idlist[i])
             videopath = Utils.getPathById(id=node["VideoDataKey"])
@@ -315,7 +344,8 @@ class ImAppendVideoNode:
                     "extraNodes": ("NODES", {"default": []}),
                     "ttsvoicepath": ("STRING", {"default": None}),
                     "wav2lip": (["YES","NO"], {"default": "YES"}),
-                    "generatedid": ("STRING", {"default": ""})
+                    "generatedid": ("STRING", {"default": ""}),
+                    "settings": ("STRING", {"default": "{ \"voiceid\": \"xujiang\" }"})
                 },
                 "hidden": {
                 },
@@ -328,7 +358,8 @@ class ImAppendVideoNode:
 
     FUNCTION = "process"
 
-    def process(self, video, entity, text, title, question, autoRoot, enableTTS, nodepointer=None, extraNodes=[], ttsvoicepath=None, wav2lip="NO",generatedid=""):
+    def process(self, video, entity, text, title, question, autoRoot, enableTTS, nodepointer=None, extraNodes=[], ttsvoicepath=None, wav2lip="NO",generatedid="", settings=""):
+        settings = json.loads(settings)
         node = ImmortalEntity.getNode()
         generatedid = node["ID"]
         if nodepointer is None or len(nodepointer) == 0:
@@ -350,8 +381,16 @@ class ImAppendVideoNode:
             ttsdir = os.path.dirname(ttsPath)
             if not os.path.exists(ttsdir):
                 os.makedirs(ttsdir)
-            TTSUtils.TTSUtils.ChatTTS_with_break(text, ttsPath)
+            # TTSUtils.TTSUtils.ChatTTS_with_break(text, ttsPath)
 
+            if settings.keys().__contains__(EntityKeyword.ttsspeakerid):
+                speaker = settings[EntityKeyword.ttsspeakerid]
+                TTSUtils.TTSUtils.cosvoiceTTS(text, ttsPath, speaker)
+            else:
+                TTSUtils.TTSUtils.cosvoiceTTS(text, ttsPath)
+            MovieMakerUtils.MovieMakerUtils.resamplewav(ttsPath, 22050)
+
+            duration = MovieMakerUtils.MovieMakerUtils.get_wav_duration(ttsPath)
             id, path = ImmortalAgent.ImmortalAgent.replaceAudio(path, ttsPath)
 
         nodetemp = node["Temporary"]
@@ -379,16 +418,62 @@ class ImAppendVideoNode:
         return newEntity, node['ID']
         pass
 
-    # @classmethod
-    # def IS_CHANGED(s, video, **kwargs):
-    #     image_path = folder_paths.get_annotated_filepath(video)
-    #     return calculate_file_hash(image_path)
-    #
-    # @classmethod
-    # def VALIDATE_INPUTS(s, video, force_size, **kwargs):
-    #     if not folder_paths.exists_annotated_filepath(video):
-    #         return "Invalid video file: {}".format(video)
-    #     return True
+
+class ImAppendQuickbackVideoNode:
+    @classmethod
+    def INPUT_TYPES(s):
+        input_dir = folder_paths.get_input_directory()
+        files = []
+        for f in os.listdir(input_dir):
+            if os.path.isfile(os.path.join(input_dir, f)):
+                file_parts = f.split('.')
+                if len(file_parts) > 1 and (file_parts[-1] in ['webm', 'mp4', 'mkv', 'gif']):
+                    files.append(f)
+        return {"required": {
+                    "video": ("PATH",),
+                    "entity": ("IMMORTALENTITY",),
+                    "text": ("STRING",{"default":""}),
+                    "title": ("STRING",{"default":""}),
+                    "question": ("STRING",{"default":""}),
+                    "autoRoot": (["YES", "NO"], {"default": "YES"}),
+                    "enableTTS": (["YES","NO"], {"default": "YES"}),
+                     },
+                "optional": {
+                    "nodepointer": ("NODE",),
+                    "extraNodes": ("NODES", {"default": []}),
+                    "ttsvoicepath": ("STRING", {"default": None}),
+                    "wav2lip": (["YES","NO"], {"default": "YES"}),
+                    "overrideBackTitle": ("STRING", {"default": None}),
+                    "generatedid": ("STRING", {"default": ""}),
+                    "settings": ("STRING", {"default": "{ \"voiceid\": \"xujiang\" }"})
+                },
+                "hidden": {
+                },
+                }
+
+    CATEGORY = "Immortal"
+
+    RETURN_TYPES = ("IMMORTALENTITY", "NODE", "NODE")
+    RETURN_NAMES = ("entity", "childpointer", "parentpointer")
+
+    FUNCTION = "process"
+
+    def process(self, video, entity, text, title, question, autoRoot, enableTTS, nodepointer=None, extraNodes=[], ttsvoicepath=None, wav2lip="NO",overrideBackTitle=None,generatedid="", settings=""):
+        videonode = ImAppendVideoNode()
+        ett, childpointer = videonode.process(video,entity,text, title,question, autoRoot, enableTTS,nodepointer,extraNodes,ttsvoicepath,wav2lip,generatedid, settings)
+
+        redirectnode = redirectToNode()
+        ett, parentpointer = redirectnode.process(ett, childpointer, nodepointer)
+        for extranode in extraNodes:
+            ett, _ = redirectnode.process(ett, childpointer, extranode)
+        if overrideBackTitle is not None and len(overrideBackTitle) > 0:
+            overridenode = ImNodeTitleOverride()
+            ett, parentpointer = overridenode.process(ett, childpointer, parentpointer, overrideBackTitle)
+            for extranode in extraNodes:
+                ett, _ = overridenode.process(ett, extranode, childpointer, overrideBackTitle)
+        # return (newEntity,)
+        return ett, childpointer, parentpointer
+        pass
 
 class ImAppendNode:
     def __init__(self):
@@ -414,7 +499,8 @@ class ImAppendNode:
             },
             "optional": {
                 "nodepointer": ("NODE",),
-                "extraNodes": ("NODES", {"default": []})
+                "extraNodes": ("NODES", {"default": []}),
+                "settings": ("STRING", {"default": "{ \"voiceid\": \"xujiang\" }"})
             }
         }
         pass
@@ -427,7 +513,8 @@ class ImAppendNode:
 
     CATEGORY = "Immortal"
 
-    def process(self, entity, image, text, title, question,ttsvoicepath, autoRoot,skipTalk, enableCache, nodepointer=None, extraNodes=[]):
+    def process(self, entity, image, text, title, question,ttsvoicepath, autoRoot,skipTalk, enableCache, nodepointer=None, extraNodes=[], settings=None):
+        settings = json.loads(settings)
         node = ImmortalEntity.getNode()
         if nodepointer is None or len(nodepointer) == 0:
             if autoRoot == "YES":
@@ -449,10 +536,17 @@ class ImAppendNode:
             if not os.path.exists(ttsdir):
                 os.makedirs(ttsdir)
             properties = entity["Properties"]
-            if properties.keys().__contains__(EntityKeyword.ttsvoiceseed):
-                voiceseed = properties[EntityKeyword.ttsvoiceseed]
-                TTSUtils.TTSUtils.ChatTTS_with_break(text, ttsPath, voiceid=int(voiceseed))
-            TTSUtils.TTSUtils.ChatTTS_with_break(text, ttsPath)
+            # if properties.keys().__contains__(EntityKeyword.ttsvoiceseed):
+            #     voiceseed = properties[EntityKeyword.ttsvoiceseed]
+            #     TTSUtils.TTSUtils.ChatTTS_with_break(text, ttsPath, voiceid=int(voiceseed))
+            # TTSUtils.TTSUtils.ChatTTS_with_break(text, ttsPath)
+
+            if settings.keys().__contains__(EntityKeyword.ttsspeakerid):
+                speaker = settings[EntityKeyword.ttsspeakerid]
+                TTSUtils.TTSUtils.cosvoiceTTS(text, ttsPath, speaker)
+            else:
+                TTSUtils.TTSUtils.cosvoiceTTS(text, ttsPath)
+            MovieMakerUtils.MovieMakerUtils.resamplewav(ttsPath, 22050)
 
             duration = MovieMakerUtils.MovieMakerUtils.get_wav_duration(ttsPath)
 
@@ -482,6 +576,63 @@ class ImAppendNode:
         newEntity = Utils.cloneDict(entity)
         # return (newEntity,)
         return newEntity, node['ID']
+        pass
+
+
+class ImAppendQuickbackNode:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(s):
+        # input_dir = config.ImmortalConfig.sucaipath
+        input_dir = folder_paths.get_input_directory()
+        files = [item.replace(input_dir+'\\', '').replace('\\', '/') for item in Utils.listAllFilesInSubFolder(input_dir)]
+        # files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
+        return {
+            "required":{
+                "entity": ("IMMORTALENTITY",),
+                "image": (sorted(files),{"image_upload": True}),
+                "text": ("STRING",{"default":""}),
+                "title": ("STRING",{"default":""}),
+                "question": ("STRING",{"default":""}),
+                "ttsvoicepath": ("STRING",{"default":""}),
+                "autoRoot": (["YES", "NO"], {"default": "YES"}),
+                "skipTalk": (["YES", "NO"], {"default": "NO"}),
+                "enableCache": (["YES", "NO"], {"default": "YES"}),
+            },
+            "optional": {
+                "nodepointer": ("NODE",),
+                "extraNodes": ("NODES", {"default": []}),
+                "overrideBackTitle": ("STRING", {"default": None}),
+                "settings": ("STRING", {"default": "{ \"voiceid\": \"xujiang\" }"})
+            }
+        }
+        pass
+    RETURN_TYPES = ("IMMORTALENTITY", "NODE", "NODE")
+    RETURN_NAMES = ("entity", "childpointer", "parentpointer")
+
+    FUNCTION = "process"
+
+    # OUTPUT_NODE = False
+
+    CATEGORY = "Immortal"
+
+    def process(self, entity, image, text, title, question,ttsvoicepath, autoRoot,skipTalk, enableCache, nodepointer=None, extraNodes=[],overrideBackTitle=None, settings=None):
+        videonode = ImAppendNode()
+        ett, childpointer = videonode.process(entity,image,text, title,question,ttsvoicepath, autoRoot, skipTalk, enableCache, nodepointer, extraNodes, settings)
+
+        redirectnode = redirectToNode()
+        ett, parentpointer = redirectnode.process(ett, childpointer, nodepointer)
+        for extranode in extraNodes:
+            ett, _ = redirectnode.process(ett, childpointer, extranode)
+        if overrideBackTitle is not None and len(overrideBackTitle) > 0:
+            overridenode = ImNodeTitleOverride()
+            ett, parentpointer = overridenode.process(ett, childpointer, parentpointer, overrideBackTitle)
+            for extranode in extraNodes:
+                ett, _ = overridenode.process(ett, extranode,childpointer, overrideBackTitle)
+        # return (newEntity,)
+        return ett, childpointer, parentpointer
         pass
 
 class mergeEntityAndPointer:
@@ -516,13 +667,14 @@ class mergeEntityAndPointer:
 
     CATEGORY = "Immortal"
 
-    def process(self, entity1,entity2,extraPrev1,extraPrev2,entity3,entity4,entity5,extraPrev3=None,extraPrev4=None,extraPrev5=None):
+    def process(self, entity1,entity2,extraPrev1,extraPrev2,entity3=None,entity4=None,entity5=None,extraPrev3=None,extraPrev4=None,extraPrev5=None):
         Node_merge = ImMergeNode()
-        mergedEntity = Node_merge.process(entity1, entity2, entity3, entity4, entity5)
+        mergedEntity = Node_merge.process(entity1, entity2, entity3, entity4, entity5)[0]
         Node_batchnode = batchNodes()
-        batched = Node_batchnode.process(extraPrev2,extraPrev3,extraPrev4,extraPrev5)
-
-        return (mergedEntity, extraPrev1, batched)
+        batched = Node_batchnode.process(extraPrev2,extraPrev3,extraPrev4,extraPrev5)[0]
+        print(f"merged entity: {mergedEntity}")
+        print(f"batched:{batched}")
+        return mergedEntity, extraPrev1, batched
         pass
 
 class batchNodes:
@@ -706,7 +858,7 @@ class ImNodeTitleOverride:
         }
         pass
     RETURN_TYPES = ("IMMORTALENTITY","NODE")
-    # RETURN_NAMES = ("image_output_name",)
+    RETURN_NAMES = ("entity","to_node")
 
     FUNCTION = "process"
 
@@ -727,11 +879,12 @@ class SetNodeMapping:
 
     @classmethod
     def INPUT_TYPES(s):
+        from .Events import EventHandler
         return {
             "required":{
                 "sceneEntity": ("IMMORTALENTITY",),
                 "node": ("NODE",),
-                "func": (["gt","lt","equal","contains"],{"default": r"equal"}),
+                "func": (list(EventHandler.Conditiondict.keys()),{"default": r"equal"}),
                 "key": ("STRING", {"default": r""}),
                 "value": ("STRING", {"default": r""}),
             }
@@ -752,8 +905,9 @@ class SetNodeMapping:
             key = json.loads(key)
         if Utils.isJsonString(value):
             value = json.loads(value)
-        if value.isdigit():
-            value = int(value)
+        if not isinstance(value, int):
+            if value.isdigit() or value.replace('-', '').isdigit():
+                value = int(value)
         mapping:list = currentnode["Mapping"]
         mapping.append({func:[key, value]})
         newEntity = Utils.cloneDict(sceneEntity)
@@ -837,7 +991,7 @@ class SetEvent:
         for i in range(0, len(keyArray)):
             k = keyArray[i]
             v = valArray[i]
-            if v.isdigit():
+            if v.isdigit() or v.replace('-', '').isdigit():
                 v = int(v)
             tar = currentnode["Events"][eventid]
             print(f'set {tar} for function {func} with key {k} and val {v}')
@@ -1045,10 +1199,13 @@ NODE_CLASS_MAPPINGS = {
     "ApplyVoiceConversion":ApplyVoiceConversion,
     "ImApplyWav2lip":ImApplyWav2lip,
     "ImDumpEntity":ImDumpEntity,
+    "ImDumpNode":ImDumpNode,
     "LoadPackage":LoadPackage,
     "SetNodeMapping":SetNodeMapping,
     "ImNodeTitleOverride":ImNodeTitleOverride,
-    "mergeEntityAndPointer":mergeEntityAndPointer
+    "mergeEntityAndPointer":mergeEntityAndPointer,
+    "ImAppendQuickbackVideoNode":ImAppendQuickbackVideoNode,
+    "ImAppendQuickbackNode":ImAppendQuickbackNode
 }
 
 # A dictionary that contains the friendly/humanly readable titles for the nodes
@@ -1066,8 +1223,11 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "ApplyVoiceConversion":"ApplyVoiceConversion",
     "ImApplyWav2lip":"ImApplyWav2lip",
     "ImDumpEntity":"ImDumpEntity",
+    "ImDumpNode": "ImDumpNode",
     "LoadPackage":"LoadPackage",
     "SetNodeMapping":"SetNodeMapping",
     "ImNodeTitleOverride":"ImNodeTitleOverride",
-    "mergeEntityAndPointer":"mergeEntityAndPointer"
+    "mergeEntityAndPointer":"mergeEntityAndPointer",
+    "ImAppendQuickbackVideoNode":"ImAppendQuickbackVideoNode",
+    "ImAppendQuickbackNode": "ImAppendQuickbackNode"
 }

@@ -132,8 +132,11 @@ class ImmortalEntity:
         # merge data field
         newData = Utils.mergeDict(nodea[EntityKeyword.data], nodeb[EntityKeyword.data])
 
+        newEvents = Utils.mergeDict(nodea[EntityKeyword.Events], nodeb[EntityKeyword.Events])
+
         nodec = Utils.cloneDict(nodea)
         nodec[EntityKeyword.data] = newData
+        nodec[EntityKeyword.Events] = newEvents
         for i in joined:
             ImmortalEntity.setPrevNode(nodec, i)
 

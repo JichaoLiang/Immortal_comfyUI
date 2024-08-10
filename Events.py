@@ -3,64 +3,130 @@ from . import ImmortalEntity
 
 class EventBehavior:
     @staticmethod
-    def set(field:dict, key:str, value):
-        field.setdefault(key, value)
+    def set(field:dict, var:list):
+        key = var[0]
+        value = var[1]
+        if not field.keys().__contains__(key):
+            field.setdefault(key, value)
+        # print(f"set: field{field}, with key : {key}, val: {value}")
+        else:
+            field[key] = value
+        # print(f"after set: {field}")
+        return field
         pass
     @staticmethod
-    def increase(field:dict, key:str, value):
+    def increase(field:dict, var):
+        key = var[0]
+        value = var[1]
         if not field.keys().__contains__(key):
             field.setdefault(key, 0)
         val = field[key]
         field[key] = val + value
+        return field
         pass
 
     @staticmethod
-    def append(field:dict, key:str, value):
+    def append(field:dict, var):
+        key = var[0]
+        value = var[1]
         if not field.keys().__contains__(key):
             field.setdefault(key, [])
         field[key].append(value)
+        return field
         pass
 
     @staticmethod
-    def remove(field:dict, key:str, value):
+    def remove(field:dict, var):
+        key = var[0]
+        value = var[1]
         if not field.keys().__contains__(key):
             field.setdefault(key, [])
         val = field[key]
         if val.__contains__(value):
             val.remove(value)
+        return field
         pass
 
     @staticmethod
-    def gt(field:dict, key:str, value)->bool:
+    def gt(field:dict, var)->bool:
+        key = var[0]
+        value = var[1]
         if not field.keys().__contains__(key):
-            return False
+            field.setdefault(key, 0)
         val = field[key]
         return val > value
         pass
 
     @staticmethod
-    def lt(field:dict, key:str, value)->bool:
+    def lt(field:dict, var)->bool:
+        key = var[0]
+        value = var[1]
+        print(f"lt: field: {field}; key: {key}; value: {value}")
         if not field.keys().__contains__(key):
-            return False
+            field.setdefault(key, 0)
         val = field[key]
         return val < value
         pass
     @staticmethod
-    def equal(field:dict, key:str, value)->bool:
+    def equal(field:dict, var)->bool:
+        key = var[0]
+        value = var[1]
         if not field.keys().__contains__(key):
-            return False
+            field.setdefault(key, 0)
         val = field[key]
         return val == value
         pass
 
     @staticmethod
-    def contains(field:dict, key:str, value)->bool:
+    def notEqual(field:dict, var)->bool:
+        key = var[0]
+        value = var[1]
         if not field.keys().__contains__(key):
-            return False
+            field.setdefault(key, 0)
+        val = field[key]
+        return val != value
+        pass
+
+    @staticmethod
+    def contains(field:dict, var)->bool:
+        key = var[0]
+        value = var[1]
+        if not field.keys().__contains__(key):
+            field.setdefault(key, [])
         val = field[key]
         return val.__contains__(value)
         pass
 
+    @staticmethod
+    def notContains(field:dict, var)->bool:
+        key = var[0]
+        value = var[1]
+        if not field.keys().__contains__(key):
+            field.setdefault(key, [])
+        val = field[key]
+        return not val.__contains__(value)
+        pass
+
+    @staticmethod
+    def And(field:dict, var)->bool:
+        key = var[0]
+        value = var[1]
+        result1:bool = EventHandler.handleCondition(field, key)
+        result2:bool = EventHandler.handleCondition(field, value)
+
+        return result1 and result2
+        pass
+
+
+    @staticmethod
+    def Or(field:dict, var)->bool:
+        key = var[0]
+        value = var[1]
+        result1:bool = EventHandler.handleCondition(field, key)
+        result2:bool = EventHandler.handleCondition(field, value)
+
+        return result1 or result2
+        pass
 
 class EventHandler:
     Eventsdict = {
@@ -74,7 +140,11 @@ class EventHandler:
         "gt": EventBehavior.gt,
         "lt": EventBehavior.lt,
         "equal": EventBehavior.equal,
+        "not_equal": EventBehavior.notEqual,
         "contains": EventBehavior.contains,
+        "not_contains": EventBehavior.notContains,
+        "and": EventBehavior.And,
+        "or": EventBehavior.Or
     }
 
     @staticmethod
@@ -86,10 +156,34 @@ class EventHandler:
             var2 = val[1]
             if EventHandler.Eventsdict.keys().__contains__(k):
                 func = EventHandler.Eventsdict[k]
-                context = func(context, var1, var2)
+                print(f'var1:{var1} var2: {var2}')
+                if var1.__eq__(keywords.ContextKeyword.allcustomvalue):
+                    keycount = len(context.keys())
+                    keys = list(context.keys())
+                    for i in range(0, keycount):
+                        contextkey = keys[i]
+                        if contextkey not in keywords.ContextKeyword.notCustomKeys:
+                            context = func(context, [var1, var2])
+                else:
+                    context = func(context, [var1, var2])
+                print(f"after handle: {context}")
         return context
         pass
 
+    @staticmethod
+    def handleCondition(context, expression):
+        k = expression.keys().__iter__().__next__()
+        val = expression[k]
+        if k == "Parent":
+            return False
+
+        var1 = val[0]
+        var2 = val[1]
+        if EventHandler.Conditiondict.keys().__contains__(k):
+            func = EventHandler.Conditiondict[k]
+            result = func(context, val)
+            return result
+        return False
 
     @staticmethod
     def conditionMapping(nodeid:str, context:dict, node:dict)->bool:

@@ -51,6 +51,18 @@ class TTSUtils:
         sound.export(to,format='wav')
 
     @staticmethod
+    def cosvoiceTTS(text, to, speakerID='dushuai'):
+        headers = {"Content-Type": "application/json"}
+        text = {"text": text, "speaker": speakerID, "new": 1}
+        response = requests.post("http://localhost:9880", data=json.dumps(text), headers=headers)
+        data = response.content
+        Utils.mkdir(to)
+        with open(to, mode='wb') as f:
+            f.write(data)
+        return to
+        pass
+
+    @staticmethod
     def breakdownText(text:str):
         muteMode = False
         result = []

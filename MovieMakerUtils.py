@@ -1,10 +1,14 @@
 import os
 import random
+import shutil
 from pathlib import Path
+
+import librosa
 import moviepy
 from moviepy.editor import *
 from moviepy.editor import CompositeVideoClip
 from moviepy.editor import CompositeAudioClip
+import soundfile as sf
 
 # from moviepy.video.compositing import *
 from moviepy.video.VideoClip import TextClip
@@ -334,6 +338,21 @@ class MovieMakerUtils:
             rate = wav_file.getframerate()
             duration = frames / float(rate)
             return duration
+
+    @staticmethod
+    def resamplewav(path, resamplerate=22050):
+        temp = path + '.temp.wav'
+        MovieMakerUtils.resample4wavs(path, temp, resamplerate)
+        os.remove(path)
+        shutil.move(temp, path)
+
+    @staticmethod
+    def resample4wavs(frompath, topath, resamplerate=22050):
+        y, sr = librosa.load(frompath)
+        to_y = librosa.resample(y, orig_sr=sr, target_sr=resamplerate)
+        # librosa.output.write_wav(tofile, to_y, resamplerate)过时代码, 需要换成下面的代码
+        sf.write(topath, to_y, resamplerate)
+
     @staticmethod
     def randomPick(length):
         rand = random.Random()

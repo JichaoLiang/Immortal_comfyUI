@@ -149,7 +149,8 @@ class Utils:
             if dict1.keys().__contains__(key) and dict2.keys().__contains__(key):
                 value = dict1[key]
                 if type(value) == type([]):
-                    merged = value + dict2[key]
+                    merged = list(set([json.dumps(s) for s in value] + [json.dumps(s) for s in dict2[key]]))
+                    merged = [json.loads(s) for s in merged]
                     result.setdefault(key, merged)
                 elif type(value) == type({}):
                     merged = Utils.mergeDict(value, dict2[key])
