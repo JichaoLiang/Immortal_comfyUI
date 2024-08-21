@@ -418,6 +418,143 @@ class ImAppendVideoNode:
         return newEntity, node['ID']
         pass
 
+class CombineVideos:
+    @classmethod
+    def INPUT_TYPES(self):
+        return {"required": {
+                    "video0": ("PATH",),
+                    },
+                "optional": {
+                    "video1": ("PATH",),
+                    "video2": ("PATH",),
+                    "video3": ("PATH",),
+                    "video4": ("PATH",),
+                    "video5": ("PATH",),
+                    }
+                }
+    CATEGORY = "Immortal"
+
+    RETURN_TYPES = ("VIDEOS",)
+    RETURN_NAMES = ("videos",)
+
+    FUNCTION = "process"
+
+    def process(self, video0,video1=None,video2=None,video3=None,video4=None,video5=None):
+        list = [video0,video1,video2,video3,video4,video5]
+        print(list)
+        return ([l for l in list if l is not None],)
+        pass
+
+
+class ImAppendFreeChatAction:
+    @classmethod
+    def INPUT_TYPES(s):
+        input_dir = folder_paths.get_input_directory()
+        files = []
+        for f in os.listdir(input_dir):
+            if os.path.isfile(os.path.join(input_dir, f)):
+                file_parts = f.split('.')
+                if len(file_parts) > 1 and (file_parts[-1] in ['webm', 'mp4', 'mkv', 'gif']):
+                    files.append(f)
+        return {"required": {
+                    "video": ("PATH",),
+                    "entity": ("IMMORTALENTITY",),
+                    "text": ("STRING",{"default":""}),
+                    "title": ("STRING",{"default":""}),
+                    "question": ("STRING",{"default":""}),
+                    "action": (["DefaultFreeChat"], {"default": "DefaultFreeChat"}),
+                    "prompt": ("STRING",{"default":""}),
+                    "videotemplatelist": ("VIDEOS", {"default": []}),
+                    "autoRoot": (["YES", "NO"], {"default": "YES"}),
+                    "enableTTS": (["YES","NO"], {"default": "YES"}),
+                     },
+                "optional": {
+                    "nodepointer": ("NODE",),
+                    "extraNodes": ("NODES", {"default": []}),
+                    "ttsvoicepath": ("STRING", {"default": None}),
+                    "wav2lip": (["YES","NO"], {"default": "YES"}),
+                    "generatedid": ("STRING", {"default": ""}),
+                    "settings": ("STRING", {"default": "{ \"voiceid\": \"xujiang\" }"})
+                },
+                "hidden": {
+                },
+                }
+
+    CATEGORY = "Immortal"
+
+    RETURN_TYPES = ("IMMORTALENTITY", "NODE")
+    RETURN_NAMES = ("entity", "pointer")
+
+    FUNCTION = "process"
+
+    def process(self, video, entity, text, title, question,action, prompt, videotemplatelist, autoRoot, enableTTS, nodepointer=None, extraNodes=[], ttsvoicepath=None, wav2lip="NO",generatedid="", settings=""):
+        print(f'videotemplatelist: {videotemplatelist}')
+        settings = json.loads(settings)
+        node = ImmortalEntity.getNode()
+        generatedid = node["ID"]
+        if nodepointer is None or len(nodepointer) == 0:
+            if autoRoot == "YES":
+                entity["Properties"]["root"] = node["ID"]
+        else:
+            ImmortalEntity.setPrevNode(node, nodepointer)
+            if extraNodes is not None and len(extraNodes) > 0:
+                for nd in [ImmortalEntity.getNodeById(entity, n) for n in extraNodes]:
+                    ImmortalEntity.setPrevNode(node, nd["ID"])
+
+        # set video
+        id, path = Utils.generatePathId(namespace="temp", exten='mp4')
+        Utils.mkdir(path)
+        shutil.copyfile(video, path)
+
+        if enableTTS == "YES":
+            ttsid, ttsPath = Utils.generatePathId(namespace="temp", exten='wav')
+            ttsdir = os.path.dirname(ttsPath)
+            if not os.path.exists(ttsdir):
+                os.makedirs(ttsdir)
+            # TTSUtils.TTSUtils.ChatTTS_with_break(text, ttsPath)
+
+            if settings.keys().__contains__(EntityKeyword.ttsspeakerid):
+                speaker = settings[EntityKeyword.ttsspeakerid]
+                TTSUtils.TTSUtils.cosvoiceTTS(text, ttsPath, speaker)
+            else:
+                TTSUtils.TTSUtils.cosvoiceTTS(text, ttsPath)
+            MovieMakerUtils.MovieMakerUtils.resamplewav(ttsPath, 22050)
+
+            duration = MovieMakerUtils.MovieMakerUtils.get_wav_duration(ttsPath)
+            id, path = ImmortalAgent.ImmortalAgent.replaceAudio(path, ttsPath)
+
+        nodetemp = node["Temporary"]
+        # book tasks
+        if ttsvoicepath is not None and len(ttsvoicepath) > 0:
+            nodetemp.setdefault("VCTask",{"inputvideokey": id, "voicepath": ttsvoicepath})
+
+        if wav2lip == "YES":
+            _,voicepath = Utils.generatePathId(namespace="temp",exten="wav")
+            clip = VideoFileClip.VideoFileClip(path)
+            audio = clip.audio
+            audio.write_audiofile(voicepath)
+            nodetemp.setdefault("wav2lip",{"inputvideokey": id, "voicepath": voicepath})
+
+        node["VideoDataKey"] = id
+        node["Title"] = title # .encode('utf-8')
+        node["Question"] = question #.encode('utf-8')
+        node["Text"] = text # .encode('utf-8')
+        node["Action"] = action
+        data:dict = ImmortalEntity.getDataField(node)
+        data[EntityKeyword.voiceId] = settings
+        data.setdefault("Prompt", prompt)
+        if len(videotemplatelist) == 0:
+            raise Exception("at least one video template required.")
+        data.setdefault("VideoTemplateList", videotemplatelist)
+
+        entity['Nodes'].append(node)
+
+
+        newEntity = Utils.cloneDict(entity)
+        # return (newEntity,)
+        return newEntity, node['ID']
+        pass
+
 
 class ImAppendQuickbackVideoNode:
     @classmethod
@@ -566,6 +703,8 @@ class ImAppendNode:
         node["Title"] = title # .encode('utf-8')
         node["Question"] = question #.encode('utf-8')
         node["Text"] = text # .encode('utf-8')
+        data = ImmortalEntity.getDataField(node)
+        data[EntityKeyword.voiceId] = settings
         entity['Nodes'].append(node)
 
         nodetemp = node["Temporary"]
@@ -1044,6 +1183,73 @@ class LoadPackage:
         return entity, pointer
         pass
 
+class grepNodeByText:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required":{
+                "sceneEntity":("IMMORTALENTITY",),
+                "text": ("STRING",)
+            }
+        }
+        pass
+    RETURN_TYPES = ("NODE",)
+    RETURN_NAMES = ("nodepointer",)
+
+    FUNCTION = "process"
+
+    # OUTPUT_NODE = False
+
+    CATEGORY = "Immortal"
+
+    def process(self, sceneEntity, text):
+        nodelist = sceneEntity["Nodes"]
+
+        result = []
+        for nd in nodelist:
+            txt = nd["Text"]
+            if txt is not None and txt == text:
+                result.append(nd["ID"])
+
+        if sceneEntity.keys().__contains__("Actions"):
+            actionlist = sceneEntity["Actions"]
+            for nd in actionlist:
+                txt = nd["Text"]
+                if txt is not None and txt == text:
+                    result.append(nd["ID"])
+        if len(result) > 0:
+            return (result[0],)
+        else:
+            return (None,)
+        pass
+
+class String2Node:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required":{
+                "nodeidStr": ("STRING",)
+            }
+        }
+        pass
+    RETURN_TYPES = ("NODE",)
+    RETURN_NAMES = ("nodepointer",)
+
+    FUNCTION = "process"
+
+    # OUTPUT_NODE = False
+
+    CATEGORY = "Immortal"
+
+    def process(self, nodeidStr):
+        return (nodeidStr,)
+        pass
 
 class SaveToDirectory:
     def __init__(self):
@@ -1131,6 +1337,11 @@ class SaveToDirectory:
             node["VideoDataKey"] = self.toPackPath(node["VideoDataKey"],videoBasePath)
             events = node["Events"]
             node["Events"] = self.allToPackPath(events,targetPath)
+            datafield:dict = ImmortalEntity.getDataField(node)
+            if datafield.keys().__contains__("VideoTemplateList"):
+                VideoTemplateList = datafield["VideoTemplateList"]
+                for i in range(0, len(VideoTemplateList)):
+                    VideoTemplateList[i] = self.toPackPath(VideoTemplateList[i], videoBasePath)
         pass
 
 class SaveImagePath:
@@ -1205,7 +1416,11 @@ NODE_CLASS_MAPPINGS = {
     "ImNodeTitleOverride":ImNodeTitleOverride,
     "mergeEntityAndPointer":mergeEntityAndPointer,
     "ImAppendQuickbackVideoNode":ImAppendQuickbackVideoNode,
-    "ImAppendQuickbackNode":ImAppendQuickbackNode
+    "ImAppendQuickbackNode":ImAppendQuickbackNode,
+    "String2Node":String2Node,
+    "grepNodeByText":grepNodeByText,
+    "CombineVideos":CombineVideos,
+    "ImAppendFreeChatAction":ImAppendFreeChatAction,
 }
 
 # A dictionary that contains the friendly/humanly readable titles for the nodes
@@ -1229,5 +1444,9 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "ImNodeTitleOverride":"ImNodeTitleOverride",
     "mergeEntityAndPointer":"mergeEntityAndPointer",
     "ImAppendQuickbackVideoNode":"ImAppendQuickbackVideoNode",
-    "ImAppendQuickbackNode": "ImAppendQuickbackNode"
+    "ImAppendQuickbackNode": "ImAppendQuickbackNode",
+    "String2Node":"String2Node",
+    "grepNodeByText":"grepNodeByText",
+    "CombineVideos":"CombineVideos",
+    "ImAppendFreeChatAction":"ImAppendFreeChatAction",
 }

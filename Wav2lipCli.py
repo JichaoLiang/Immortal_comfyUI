@@ -9,6 +9,7 @@ import sys
 # sys.path.append("")
 # print(script_path)
 
+from gradio_client import client,handle_file
 from .Utils import Utils
 import time
 import hashlib
@@ -20,6 +21,37 @@ vhspkg = __import__("ComfyUI-VideoHelperSuite")
 vhsnodes = vhspkg.videohelpersuite.nodes
 
 class Wav2lipCli:
+    @staticmethod
+    def videocheckpointExists(videoCheckpointID:str)->bool:
+        checkpoint_basepath = r'D:\MyWork\Projects\dhlive\DH_live\video_data'
+        ckptpath = os.path.join(checkpoint_basepath, videoCheckpointID)
+        return os.path.exists(ckptpath)
+
+    @staticmethod
+    def dh_live(audioPath: str, faceVideoID: str, toPath: str):
+        client = Client("http://127.0.0.1:7860/")
+        result = client.predict(
+            face=faceVideoID,
+            audio=handle_file(audioPath),
+            api_name="/do_cloth"
+        )
+        print(result)
+        videopath = result["video"]
+        shutil.move(videopath, toPath)
+        return toPath
+        pass
+
+    @staticmethod
+    def dh_live_make_checkpoint(videopath:str):
+        client = Client("http://127.0.0.1:7860/")
+        result = client.predict(
+            face={"video": handle_file(videopath)},
+            api_name="/do_make"
+        )
+        print(result)
+        videoname = os.path.basename(videopath)
+        return videoname
+
     @staticmethod
     def musetalk(audioPath: str, faceVideoPath: str, toPath: str, bbox_shift=6, batch_size=16):
         # Utils.mkdir(toPath)
@@ -138,6 +170,9 @@ class Wav2lipCli:
                 to = cache["path"]
             else:
                 toid, to = Utils.generatePathId(namespace="wav2lip", exten="mp4")
+                todir = os.path.dirname(to)
+                if not os.path.exists(todir):
+                    os.mkdir(todir)
                 if use=="musetalk":
                     Wav2lipCli.musetalk(voice, video, to)
                 elif use=="wav2lip":

@@ -9,7 +9,8 @@ class ImmortalEntity:
                       "Properties": {
 
                       },
-                      "Nodes": []
+                      "Nodes": [],
+                      "Actions": [],
                     }
         return entity
 
@@ -19,6 +20,30 @@ class ImmortalEntity:
                   "ID": "",
                   "Mapping": [],
                   "VideoDataKey": "",
+                  "Title": "",
+                  "Question": "",
+                  "Events": {
+                    "OnEnter": [
+                    ],
+                    "OnLeave": {
+                    }
+                  },
+                  "Data":{
+                  },
+                  "Temporary":{
+
+                  }
+              }
+        id = Utils.generateId()
+        node["ID"] = id
+        return node
+
+    def getActionNode(self):
+        node = {
+                  "ID": "",
+                  "Mapping": [],
+                  "VideoDataKey": "",
+                  "Action": "",
                   "Title": "",
                   "Question": "",
                   "Events": {
@@ -109,9 +134,11 @@ class ImmortalEntity:
             return defaultTitle
         return overridesection[overridenodeid]
 
+
     @staticmethod
-    def searchNextNodes(entity, nodeid, context:dict)->list:
+    def searchNext(entity, nodeid, context:dict)->tuple:
         listnode = []
+        listactions = []
         nodes = entity["Nodes"]
         for nd in nodes:
             ismatched = EventHandler.conditionMapping(nodeid, context, nd)
@@ -120,7 +147,35 @@ class ImmortalEntity:
             overrideTitle = ImmortalEntity.getTitleOverride(nd, nodeid)
             if ismatched:
                 listnode.append({"ID": nd["ID"], "Title":overrideTitle, "Question": nd["Question"]})
+
+        if entity.keys().__contains__('Actions'):
+            actions = entity["Actions"]
+            for nd in actions:
+                ismatched = EventHandler.conditionMapping(nodeid, context, nd)
+                # nodeids = ImmortalEntity.getPrevNode(nd)
+                # if nodeids.__contains__(nodeid):
+                overrideTitle = ImmortalEntity.getTitleOverride(nd, nodeid)
+                if ismatched:
+                    listactions.append({"ID": nd["ID"], "Title": overrideTitle, "Question": nd["Question"]})
+
+        return listnode, listactions
+
+    @staticmethod
+    def searchNextNodes(entity, nodeid, context:dict)->list:
+        listnode, _ = ImmortalEntity.searchNext(entity, nodeid, context)
         return listnode
+
+    @staticmethod
+    def searchNextActions(entity, nodeid, context:dict)->list:
+        _, listactions = ImmortalEntity.searchNext(entity, nodeid, context)
+        return listactions
+
+    @staticmethod
+    def getNodeType(node:dict):
+        if node.keys().__contains__("Action"):
+            return "Action"
+        else:
+            return "Node"
 
     @staticmethod
     def mergeNode(nodea, nodeb):
@@ -141,3 +196,7 @@ class ImmortalEntity:
             ImmortalEntity.setPrevNode(nodec, i)
 
         return nodec
+
+class NodeType:
+    Action = "Action"
+    Node = "Node"
