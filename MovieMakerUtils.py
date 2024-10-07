@@ -299,7 +299,7 @@ class MovieMakerUtils:
         pass
 
     @staticmethod
-    def imageToVideo(imgPath, duration, to, resize=(900, 1200)):
+    def imageToVideo(imgPath, duration, to, resize=(920, 1480)):
         clip = ImageClip(imgPath, duration=duration)
         if resize is not None:
             clip = clip.resize(resize)
@@ -328,6 +328,9 @@ class MovieMakerUtils:
         sequence = [bg, clip]
         composited = CompositeVideoClip(sequence)
 
+        dir = os.path.dirname(to)
+        if not os.path.exists(dir):
+            os.makedirs(dir)
         composited.write_videofile(to,fps=24)
         return to
 

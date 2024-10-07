@@ -37,6 +37,23 @@ class OllamaCli:
         # print(result['message']['content'])
         return result
 
+    @staticmethod
+    def roleplayOnce(system, message, model='qwen2.5'):
+        systemmessage = {
+            'role':'system',
+            'content':system
+        }
+
+        usermessage = {
+            'role':'user',
+            'content':message
+        }
+
+        msginput = [systemmessage,usermessage]
+        result = OllamaCli.chat(msginput, model=model)
+        return result
+
+
 if __name__ == '__main__':
     # talkchain = ['你好', '你是什么模型？', '可以扮演一个老爷爷和我说话吗？', '老爷爷，请问你什么事普朗克常量呀？', '那您可以给我具体讲一讲吗？']
     # result = OllamaCli.chatSeq(talkchain,askindividually=True)

@@ -7,7 +7,7 @@ class ImmortalEntity:
     def getEntity():
         entity = {
                       "Properties": {
-
+                          "context": {}
                       },
                       "Nodes": [],
                       "Actions": [],
@@ -88,15 +88,15 @@ class ImmortalEntity:
             prevNodes.append(key)
         mapping = node["Mapping"]
         for item in mapping:
-            print(f"item {item}")
-            print(f"type of item {type(item)}")
+            # print(f"item {item}")
+            # print(f"type of item {type(item)}")
             if item.keys().__contains__("Parent"):
                 item["Parent"] = ",".join(prevNodes)
         pass
 
     @staticmethod
     def getNodeById(entity, nodeid):
-        print(f"node:{entity}")
+        # print(f"node:{entity}")
         nodes = entity["Nodes"]
         for nd in nodes:
             if nd["ID"] == nodeid:
@@ -188,14 +188,49 @@ class ImmortalEntity:
         newData = Utils.mergeDict(nodea[EntityKeyword.data], nodeb[EntityKeyword.data])
 
         newEvents = Utils.mergeDict(nodea[EntityKeyword.Events], nodeb[EntityKeyword.Events])
-
+        # newMapping = list(set(nodea[EntityKeyword.Mapping] + nodeb[EntityKeyword.Mapping]))
         nodec = Utils.cloneDict(nodea)
         nodec[EntityKeyword.data] = newData
         nodec[EntityKeyword.Events] = newEvents
+        # nodec[EntityKeyword.Mapping] = newMapping
         for i in joined:
             ImmortalEntity.setPrevNode(nodec, i)
 
         return nodec
+
+    @staticmethod
+    def getDisableKey(nodeid):
+        return f"disabled_{nodeid}"
+
+    @staticmethod
+    def getContextField(entity):
+        prop:dict = entity["Properties"]
+        if not prop.keys().__contains__("context"):
+            prop.setdefault("context", {})
+        return prop["context"]
+
+    @staticmethod
+    def SetContext(entity, key, value):
+        contextField:dict = ImmortalEntity.getContextField(entity)
+        if not contextField.keys().__contains__(key):
+            contextField.setdefault(key, value)
+        else:
+            contextField[key] = value
+        return entity
+        pass
+
+    @staticmethod
+    def mergeContext(entity1, entity2):
+        contxt1 = ImmortalEntity.getContextField(entity1)
+        contxt2 = ImmortalEntity.getContextField(entity2)
+        print(f'====ctxt1 : {contxt1}')
+        print(f'====ctxt2 : {contxt2}')
+        merged = Utils.mergeDict(contxt1, contxt2)
+
+        print(f'====merged : {merged}')
+        # newEntity = Utils.cloneDict(entity1)
+        entity1["Properties"]["context"] = merged
+        return entity1
 
 class NodeType:
     Action = "Action"

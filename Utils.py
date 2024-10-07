@@ -44,6 +44,8 @@ class Utils:
         keypath = keyMaybe
         try:
             print(keypath)
+            if os.path.exists(keyMaybe):
+                return keyMaybe
             keypath = Utils.getPathById(id=keypath)
             print(keypath)
         except Exception as e:
@@ -156,7 +158,7 @@ class Utils:
                     merged = Utils.mergeDict(value, dict2[key])
                     result.setdefault(key, merged)
                 else:
-                    result.setdefault(value)
+                    result.setdefault(key, value)
             elif dict1.keys().__contains__(key) and not dict2.keys().__contains__(key):
                 result.setdefault(key, dict1[key])
             elif not dict1.keys().__contains__(key) and dict2.keys().__contains__(key):
@@ -176,3 +178,11 @@ class Utils:
                 result = result + Utils.listAllFilesInSubFolder(f)
         return result
         pass
+
+    @staticmethod
+    def is_float(string):
+        try:
+            float(string)
+            return True
+        except:
+            return False

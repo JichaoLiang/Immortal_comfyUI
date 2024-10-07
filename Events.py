@@ -186,9 +186,22 @@ class EventHandler:
         return False
 
     @staticmethod
+    def checkdisablekey(nodeid, context):
+        disablekey = EventHandler.getdisablekey(nodeid)
+        if context.keys().__contains__(disablekey) and int(context[disablekey]) > 0:
+            return False
+        return True
+
+    @staticmethod
+    def getdisablekey(nodeid):
+        return f"disabled_{nodeid}"
+
+    @staticmethod
     def conditionMapping(nodeid:str, context:dict, node:dict)->bool:
+        if not EventHandler.checkdisablekey(nodeid, context):
+            return False
         mapping:list = node["Mapping"]
-        previdlist = ImmortalEntity.ImmortalEntity.getPrevNode(node)
+        previdlist = ImmortalEntity.getPrevNode(node)
         if previdlist is not None and len(previdlist) > 0:
             if not previdlist.__contains__(nodeid):
                 return False
